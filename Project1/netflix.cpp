@@ -49,35 +49,6 @@ struct point {
     point(double x, double y) : x(x), y(y) {}
 };
 
-//to hide console cursor (doesn't work for some reason? it did before.)
-void ShowConsoleCursor(bool showFlag)
-{
-    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    CONSOLE_CURSOR_INFO     cursorInfo;
-
-    GetConsoleCursorInfo(out, &cursorInfo);
-    cursorInfo.bVisible = showFlag;
-    SetConsoleCursorInfo(out, &cursorInfo);
-}
-
-//to avoid system()
-void clear() {
-    COORD topLeft = { 0, 0 };
-    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO screen;
-    DWORD written;
-
-    GetConsoleScreenBufferInfo(console, &screen);
-    FillConsoleOutputCharacterA(
-        console, ' ', screen.dwSize.X * screen.dwSize.Y, topLeft, &written
-    );
-    FillConsoleOutputAttribute(
-        console, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE,
-        screen.dwSize.X * screen.dwSize.Y, topLeft, &written
-    );
-    SetConsoleCursorPosition(console, topLeft);
-}
 
 inline bool is_color(int red, int green, int blue) {
 
@@ -101,26 +72,6 @@ inline bool is_color(int red, int green, int blue) {
             red >= 110 &&
             blue >= 100;
     }
-
-    // yellow
-    else {
-        if (red < 160)
-        {
-            return false;
-        }
-        if (red > 161 && red < 255) {
-            return green > 150 && green < 255 && blue > 0 && blue < 79;
-        }
-        return false;
-    }
-}
-
-std::string ws2s(const std::wstring& wstr)
-{
-    int size_needed = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), int(wstr.length() + 1), 0, 0, 0, 0);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), int(wstr.length() + 1), &strTo[0], size_needed, 0, 0);
-    return strTo;
 }
 
 class MainFunction {
@@ -129,9 +80,6 @@ private:
     uint32_t header[2] = { 0x12345678, 0 };
 
     void findHardware() {
-        wchar_t currentDir[MAX_PATH];
-        GetCurrentDirectoryW(MAX_PATH, currentDir);
-        system("sc stop faceit");
         std::this_thread::sleep_for(std::chrono::seconds(1));
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
@@ -183,9 +131,9 @@ public:
     void shoot() {
         uint32_t packet[5] = { header[0], header[1], 0, 0, 0x1 };
         send_packet(packet);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        //packet[4] = 0x2;
-        //send_packet(packet);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        packet[4] = 0x2;
+        send_packet(packet);
     }
 };
 
@@ -259,23 +207,18 @@ void bot() {
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
     //for toggle keys
-    bool trigger = false;
-    bool toggleKey = false;
     bool toggleActive = true;
     bool aim = false;
-    bool changeKey = false;
     bool lClick = false;
     bool mb4 = false;
     bool mb5 = false;
-    bool hold = false;
+    bool hold = true;
 
     HWND deeznuts;
     deeznuts = FindWindowW(NULL, INAME);
     HDC nDC = GetDC(deeznuts);
-    BOOL netflix_check;
 
-    string color;
-    int mode = 0;
+    int mode = 3;
 
     double sensitivity = 0.52;
     double smoothing = 0.5;
@@ -296,17 +239,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		sensitivity = reader.GetFloat("config", "sensitivity", 0.00);
 		smoothing = reader.GetFloat("config", "smoothing", 0.00);
-		mode = reader.GetInteger("config", "mode", 0);
 
-        if (reader.Get("config", "trigger", "") == "TRUE") {
-            trigger = true;
-        }
-        else if (reader.Get("config", "trigger", "") == "FALSE")
-        {
-            trigger = false;
-        }
-
-		color = reader.Get("settings", "aim color", "");
 		if (reader.Get("settings", "snapping area", "") == "HEAD") {
 			snapValue = 1;
 		}
@@ -317,35 +250,19 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			snapValue = 8;
 		}
 
-		if (reader.Get("settings", "toggle key", "") == "LCLICK") {
+		if (reader.Get("settings", "hold key", "") == "LCLICK") {
 			lClick = true;
 		}
-		else if (reader.Get("settings", "toggle key", "") == "MB4") {
+		else if (reader.Get("settings", "hold key", "") == "MB4") {
 			mb4 = true;
 		}
-		else if (reader.Get("settings", "toggle key", "") == "MB5") {
+		else if (reader.Get("settings", "hold key", "") == "MB5") {
 			mb5 = true;
-		}
-
-		if (reader.Get("settings", "hold or toggle", "") == "TOGGLE") {
-			hold = false;
-		}
-		if (reader.Get("settings", "hold or toggle", "") == "HOLD") {
-			hold = true;
 		}
 
 		fovW = reader.GetInteger("settings", "hFov", 0);
 		fovH = reader.GetInteger("settings", "vFov", 0);
 
-		if (color == "PURPLE") {
-			// set color mode
-			colorMode = 0;
-		}
-
-		else if (color == "YELLOW") {
-			// set color mode
-			colorMode = 1;
-		}
 		thread(bot).detach();
 
 		auto t_start = std::chrono::high_resolution_clock::now();
@@ -393,6 +310,17 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 							aim = false;
 						}
 					}
+
+                    if (lClick == true) {
+                        if (GetAsyncKeyState(VK_LBUTTON))
+                        {
+                            aim = true;
+                        }
+                        else
+                        {
+                            aim = false;
+                        }
+                    }
 				}
 
 				if (aim) {
@@ -437,9 +365,16 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 						}
 					}
 				}
-				if ((aim_x != 0 || aim_y != 0) && GetAsyncKeyState(VK_LMENU)){
-					obj.shoot();
-				}
+                if (GetAsyncKeyState(VK_LMENU)) {
+                    if ((aim_x != 0 || aim_y != 0)) {
+                        obj.shoot();
+                    }
+                }
+
+                if (GetAsyncKeyState(VK_DELETE) & 1) {
+                    Beep(800, 300);
+                    exit(1);
+                }
 			}
 			//end
 		}
