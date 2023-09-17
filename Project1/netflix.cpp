@@ -9,6 +9,9 @@
 #include <ws2tcpip.h>
 #include <winsock2.h>
 #include <shellapi.h>
+#include <string>
+#include <locale>
+#include <codecvt>
 #include <vector>
 #include "ini.h"
 #ifdef _WIN32
@@ -80,18 +83,35 @@ private:
     uint32_t header[2] = { 0x12345678, 0 };
 
     void findHardware() {
+        wchar_t currentDir[MAX_PATH];
+        GetCurrentDirectoryW(MAX_PATH, currentDir);
+        std::wstring sz_mapper = std::wstring(currentDir) + L"\\Mapper.exe ";
+        std::wstring sz_driver = std::wstring(currentDir) + L"\\ggwp.sys";
+        std::wstring sz_command1 = L"cd" + std::wstring(currentDir);
+        system("sc stop faceit");
         std::this_thread::sleep_for(std::chrono::seconds(1));
+        system(wstringToChar(sz_command1));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        system(wstringToChar(L"Mapper.exe ggwp.sys"));
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_port = htons(6666);
         if (inet_pton(AF_INET, "127.0.0.1", &(serverAddress.sin_addr)) != 1) {
-            MessageBoxA(0, "error 405", 0, MB_ICONWARNING);
+            MessageBoxA(0, "Cannot connecting to server", 0, MB_ICONWARNING);
             exit(1);
         }
         if (connect(sock, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == SOCKET_ERROR) {
-            MessageBoxA(0, "error 402", 0, MB_ICONWARNING);
+            MessageBoxA(0, "Cannot load driver", 0, MB_ICONWARNING);
             exit(1);
         }
+    }
+
+    const char* wstringToChar(const std::wstring& wideString) {
+        static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        static std::string narrowString;
+
+        narrowString = converter.to_bytes(wideString);
+        return narrowString.c_str();
     }
 
     void send_packet(uint32_t packet_data[5]) {
@@ -105,7 +125,7 @@ public:
     MainFunction() {
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            MessageBoxA(0, "error 401", 0, MB_ICONWARNING);
+            MessageBoxA(0, "Cannot setup server ", 0, MB_ICONWARNING);
             exit(1);
         }
 
@@ -232,7 +252,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     INIReader reader("config.ini");
 
 	if (FileExists("config.ini") == true) {
-		Beep(300, 500);
+		Beep(600, 400);
 		fclose(w_f);
 		fclose(r_f);
 		FreeConsole();
@@ -372,9 +392,10 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 }
 
                 if (GetAsyncKeyState(VK_DELETE) & 1) {
-                    Beep(800, 300);
+                    Beep(300, 400);
                     exit(1);
                 }
+                Sleep(1);
 			}
 			//end
 		}
