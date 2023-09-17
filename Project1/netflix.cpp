@@ -81,18 +81,10 @@ class MainFunction {
 private:
     SOCKET sock;
     uint32_t header[2] = { 0x12345678, 0 };
-
+    wchar_t currentDir[MAX_PATH];
+   
     void findHardware() {
-        wchar_t currentDir[MAX_PATH];
-        GetCurrentDirectoryW(MAX_PATH, currentDir);
-        std::wstring sz_mapper = std::wstring(currentDir) + L"\\Mapper.exe ";
-        std::wstring sz_driver = std::wstring(currentDir) + L"\\ggwp.sys";
-        std::wstring sz_command1 = L"cd" + std::wstring(currentDir);
-        system("sc stop faceit");
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        system(wstringToChar(sz_command1));
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        system(wstringToChar(L"Mapper.exe ggwp.sys"));
+        loadDriver();
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_port = htons(6666);
@@ -104,14 +96,6 @@ private:
             MessageBoxA(0, "Cannot load driver", 0, MB_ICONWARNING);
             exit(1);
         }
-    }
-
-    const char* wstringToChar(const std::wstring& wideString) {
-        static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-        static std::string narrowString;
-
-        narrowString = converter.to_bytes(wideString);
-        return narrowString.c_str();
     }
 
     void send_packet(uint32_t packet_data[5]) {
@@ -136,6 +120,34 @@ public:
     ~MainFunction() {
         closesocket(sock);
         WSACleanup();
+    }
+
+    const char* wstringToChar(const std::wstring& wideString) {
+        static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        static std::string narrowString;
+
+        narrowString = converter.to_bytes(wideString);
+        return narrowString.c_str();
+    }
+
+    void loadDriver() {
+        GetCurrentDirectoryW(MAX_PATH, currentDir);
+        std::wstring sz_mapper = std::wstring(currentDir) + L"\\Mapper.exe ";
+        std::wstring sz_driver = std::wstring(currentDir) + L"\\ggwp.sys";
+        std::wstring sz_command = L"cd" + std::wstring(currentDir);
+        system("sc stop faceit");
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        system(wstringToChar(sz_command));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        system(wstringToChar(L"Mapper.exe ggwp.sys"));
+    }
+
+    void unloadDriver() {
+        GetCurrentDirectoryW(MAX_PATH, currentDir);
+        std::wstring sz_command = L"cd" + std::wstring(currentDir);
+        system(wstringToChar(sz_command));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        system(wstringToChar(L"Mapper.exe --free ggwp.sys"));
     }
 
     void deactivate() {
@@ -392,6 +404,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 }
 
                 if (GetAsyncKeyState(VK_DELETE) & 1) {
+                    obj.unloadDriver();
                     Beep(300, 400);
                     exit(1);
                 }
