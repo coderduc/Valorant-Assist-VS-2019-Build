@@ -408,7 +408,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     Beep(300, 400);
                     exit(1);
                 }
-                Sleep(1);
+                
 			}
 			//end
 		}
